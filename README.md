@@ -50,18 +50,22 @@ touching this repo.
 ## Schema
 
 There is no declarative schema file. A template that needs tables ships an
-executable `.result/setup.sh`, run once after the project is created with the
-`result` CLI already authenticated:
+executable `.result/setup.sh`. It runs once, from the project root, after
+`.env.local` is written, so the CLI resolves its own credentials:
 
 ```sh
 #!/usr/bin/env bash
 set -euo pipefail
 
-result db create-table products \
+npx --yes @resultdev/cli db create-table products \
   -c "name:string:required" \
   -c "price_cents:int:required" \
   --no-rls
 ```
+
+It runs exactly once, when the project is created. It is not a migration
+system: a template that changes its schema later is a new template, or a change
+existing users will not get.
 
 `blank` ships none. Keep it that way: a blank app should add nothing to a
 user's database that they did not ask for.

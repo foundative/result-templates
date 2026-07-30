@@ -41,11 +41,12 @@ and three states so a reload never flashes the signed-out UI at a member.
 
 ## Schema changes
 
-Use the `result` CLI. It is installed and authenticated.
+Use the CLI from bash, in the project root. It reads the backend URL and admin
+key out of `.env.local` on its own, so there is nothing to log into.
 
 ```
-result db create-table posts -c "title:string:required" -c "body:text"
-result db migrate --name posts-policies --sql "create policy ..."
+npx @resultdev/cli db create-table posts -c "title:string:required" -c "body:text"
+npx @resultdev/cli db migrate --name posts-policies --sql "create policy ..."
 ```
 
 Do not write migration files by hand and do not reach for another ORM or
