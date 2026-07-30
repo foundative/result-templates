@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "templates": [
+    {
+      "id": "blank",
+      "name": "Blank app",
+      "description": "A fresh Next.js app with TypeScript and Tailwind, wired to your database, auth and storage.",
+      "tags": ["Next.js", "TypeScript", "Tailwind"]
+    }
+  ]
+}

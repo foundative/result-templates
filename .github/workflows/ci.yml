@@ -1,0 +1,69 @@
+# Every template on main must install, typecheck and build.
+#
+# The builder fetches main directly, so a merge that breaks a template breaks
+# project creation for every user immediately. This workflow is the only thing
+# standing in front of that.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  registry:
+    runs-on: ubuntu-latest
+    outputs:
+      templates: ${{ steps.ids.outputs.ids }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Registry and directories agree
+        run: node scripts/check-registry.mjs
+
+      # The pattern is assembled rather than written out, so this file does not
+      # match itself and fail every run.
+      - name: No vendor names in anything users can see
+        run: |
+          pattern="$(printf 'insfor%s' 'ge')"
+          if grep -ril --exclude-dir=.git "$pattern" .; then
+            echo "::error::A vendor name is in this repo. The backend is 'Result Backend'."
+            exit 1
+          fi
+
+      - id: ids
+        run: echo "ids=$(jq -c '[.templates[].id]' templates.json)" >> "$GITHUB_OUTPUT"
+
+  template:
+    needs: registry
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        template: ${{ fromJSON(needs.registry.outputs.templates) }}
+    defaults:
+      run:
+        working-directory: templates/${{ matrix.template }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: templates/${{ matrix.template }}/package-lock.json
+
+      # npm ci, not npm install: it is what the builder runs, and it fails loudly
+      # when the lockfile has drifted from package.json instead of quietly fixing it.
+      - run: npm ci
+
+      # The backend client reads its URL at module scope, so a prerender without
+      # env fails. Placeholders are enough to prove the tree compiles and renders.
+      - run: cp .env.example .env.local
+
+      - run: npm run typecheck
+      - run: npm run build
+
+      # A template that ships schema setup must at least be runnable.
+      - name: setup.sh is executable
+        run: test ! -f .result/setup.sh || test -x .result/setup.sh
