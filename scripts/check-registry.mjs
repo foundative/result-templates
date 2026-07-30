@@ -57,6 +57,17 @@ for (const entry of registry.templates ?? []) {
     }
   }
 
+  // Git does not descend into an ignored directory, so a template that ignores
+  // `.result/` wholesale can never commit its own setup script. The failure is
+  // silent: the file exists locally, is absent from the tarball, and the schema
+  // it was meant to create never appears.
+  const ignore = readFileSync(join(dir, ".gitignore"), "utf8");
+  if (ignore.includes(".result/") && !ignore.includes("!.result/setup.sh")) {
+    problems.push(
+      `templates/${entry.id}: .gitignore must use ".result/*" plus "!.result/setup.sh"`,
+    );
+  }
+
   const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
   for (const script of ["dev", "build", "typecheck"]) {
     if (!pkg.scripts?.[script]) {

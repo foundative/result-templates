@@ -36,8 +36,12 @@ yarn-error.log*
 !.env.example
 .env.local
 
-# build state written by the builder (setup log, dev server markers)
-.result/
+# Build state written by the builder: setup log, dev server markers. The one
+# thing in here that IS committed is a template's own setup script. Git does not
+# descend into an ignored directory, so this has to ignore the contents rather
+# than the directory, or the negation below can never match.
+.result/*
+!.result/setup.sh
 
 # vercel
 .vercel
