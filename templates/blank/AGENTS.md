@@ -39,6 +39,21 @@ It is the correct shape for auth in this app: `getCurrentUser()` on mount to
 redeem the stored session, `onAuthStateChange()` in addition for later changes,
 and three states so a reload never flashes the signed-out UI at a member.
 
+## One look everywhere
+
+This app is white and has ONE palette, in `app/globals.css`. Change a color
+there and it changes for everyone.
+
+Never make how the app looks depend on the viewer's machine. No
+`@media (prefers-color-scheme: ...)`, and no second set of colors behind it.
+`dark:` utilities are gated on a `.dark` class that nothing adds, so they do
+nothing on their own; leaving one in your markup is harmless, relying on one is
+a bug. Two palettes driven by an OS setting means the owner sees one of them
+while your edits land in the other, and your work looks like it did nothing.
+
+If the owner asks for a dark mode, build it as that `.dark` class on `<html>`
+with a control they can press, never as a media query.
+
 ## Schema changes
 
 Use the CLI from bash, in the project root. It reads the backend URL and admin

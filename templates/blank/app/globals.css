@@ -1,6 +1,19 @@
 @import "tailwindcss";
 
+/* ONE LOOK EVERYWHERE. This app is white, always.
+   Nothing here reads the viewer's system settings, so the app cannot look one
+   way in the builder's preview pane and another way in a browser tab, and a
+   color you change is a color you can see. Do not put the palette behind
+   `@media (prefers-color-scheme: ...)`: two palettes driven by an OS setting
+   means the owner sees one of them while edits land in the other, which reads
+   as the builder doing nothing. `dark:` utilities are gated on a `.dark` class
+   that nothing here adds, so a stray one cannot bring a second palette back by
+   accident. If a dark mode is ever wanted, it is that class, put on <html> on
+   purpose. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
+  color-scheme: light;
   --background: #ffffff;
   --foreground: #171717;
 }
@@ -10,13 +23,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {

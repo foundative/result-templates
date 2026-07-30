@@ -53,11 +53,9 @@ export function SignIn() {
   if (user) {
     return (
       <div className="flex h-10 items-center gap-3">
-        <span className="text-sm text-zinc-600 dark:text-zinc-400">
-          Signed in as {user.email}
-        </span>
+        <span className="text-sm text-zinc-600">Signed in as {user.email}</span>
         <button
-          className="rounded-full border border-black/10 px-4 py-1.5 text-sm transition-colors hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/10"
+          className="rounded-full border border-black/10 px-4 py-1.5 text-sm transition-colors hover:bg-black/5"
           onClick={() => void signOut()}
           type="button"
         >
@@ -79,9 +77,7 @@ export function SignIn() {
       >
         Sign in with Google
       </button>
-      {problem ? (
-        <p className="text-sm text-red-600 dark:text-red-400">{problem}</p>
-      ) : null}
+      {problem ? <p className="text-sm text-red-600">{problem}</p> : null}
     </div>
   );
 }
