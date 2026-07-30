@@ -13,6 +13,7 @@ import { backend } from "@/lib/backend";
 export function SignIn() {
   const [user, setUser] = useState<UserSchema | null>(null);
   const [loading, setLoading] = useState(true);
+  const [problem, setProblem] = useState<string | null>(null);
 
   useEffect(() => {
     // getCurrentUser() is what redeems the stored session. onAuthStateChange()
@@ -28,6 +29,24 @@ export function SignIn() {
     });
   }, []);
 
+  // Every auth call RETURNS its error rather than throwing, so a handler that
+  // ignores the result turns a blocked popup, an unreachable backend or a
+  // cross-origin redirectTo into a button that visibly does nothing. Show it.
+  async function signIn() {
+    setProblem(null);
+    const { error } = await backend.auth.signInWithOAuth("google", {
+      // Must stay on this app's own origin: the popup can only hand its result
+      // back to a page it shares an origin with.
+      redirectTo: window.location.origin,
+    });
+    if (error) setProblem(error.nextActions ?? error.message);
+  }
+
+  async function signOut() {
+    const { error } = await backend.auth.signOut();
+    if (error) setProblem(error.message);
+  }
+
   // Reserve the height so the row does not jump when the session resolves.
   if (loading) return <div className="h-10" />;
 
@@ -39,7 +58,7 @@ export function SignIn() {
         </span>
         <button
           className="rounded-full border border-black/10 px-4 py-1.5 text-sm transition-colors hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/10"
-          onClick={() => void backend.auth.signOut()}
+          onClick={() => void signOut()}
           type="button"
         >
           Sign out
@@ -49,19 +68,20 @@ export function SignIn() {
   }
 
   return (
-    <button
-      className="flex h-10 w-fit items-center rounded-full bg-foreground px-5 text-sm font-medium text-background transition-opacity hover:opacity-90"
-      // From a click handler, never an effect: when this app is framed the SDK
-      // opens the provider in a popup, and a popup opened outside a user
-      // gesture is blocked by the browser.
-      onClick={() =>
-        void backend.auth.signInWithOAuth("google", {
-          redirectTo: window.location.origin,
-        })
-      }
-      type="button"
-    >
-      Sign in with Google
-    </button>
+    <div className="flex flex-col gap-2">
+      <button
+        className="flex h-10 w-fit items-center rounded-full bg-foreground px-5 text-sm font-medium text-background transition-opacity hover:opacity-90"
+        // From a click handler, never an effect: when this app is framed the SDK
+        // opens the provider in a popup, and a popup opened outside a user
+        // gesture is blocked by the browser.
+        onClick={() => void signIn()}
+        type="button"
+      >
+        Sign in with Google
+      </button>
+      {problem ? (
+        <p className="text-sm text-red-600 dark:text-red-400">{problem}</p>
+      ) : null}
+    </div>
   );
 }
