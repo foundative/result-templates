@@ -12,6 +12,7 @@ import {
   formatPrice,
   formatTime,
   minutesToClock,
+  safeZone,
 } from "@/lib/schedule";
 
 type Site = {
@@ -73,7 +74,9 @@ function Upcoming() {
       .select("id,service_id,starts_at,minutes,name,email,note")
       .gte("starts_at", new Date().toISOString())
       .order("starts_at", { ascending: true })
-      .limit(50);
+      // Two weeks of short appointments passes 50 easily, and a truncated list
+      // presented as the whole schedule is how somebody gets stood up.
+      .limit(500);
     setRows((data as Booking[] | null) ?? []);
   }
 
@@ -405,6 +408,16 @@ function Settings() {
   async function save() {
     if (!site) return;
     setProblem(null);
+    // Caught here rather than at the far end. A zone Intl does not recognise
+    // saves happily and then breaks the public booking page, and the owner has
+    // no way to connect the two.
+    const zone = site.time_zone?.trim() ?? "";
+    if (zone && safeZone(zone) !== zone) {
+      setProblem(
+        `"${zone}" is not a time zone. Use a name like Europe/London or America/New_York.`,
+      );
+      return;
+    }
     const { error } = await backend.database
       .from("site")
       .update({

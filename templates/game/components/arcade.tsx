@@ -28,6 +28,7 @@ export function Arcade() {
   const [lastScore, setLastScore] = useState<number | null>(null);
   const [name, setName] = useState("");
   const [saved, setSaved] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
 
   const loadScores = useCallback(async () => {
     const { data } = await backend.database
@@ -65,11 +66,27 @@ export function Arcade() {
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (lastScore === null) return;
-    await fetch("/api/score", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name, score: lastScore }),
-    });
+    setProblem(null);
+    // Checked, not assumed. Hiding the form on a 429 or a 502 tells the player
+    // their score is on the board when it is not, and the only way back is to
+    // play another round.
+    try {
+      const response = await fetch("/api/score", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, score: lastScore }),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        setProblem(body?.error ?? "Could not save that score. Try again.");
+        return;
+      }
+    } catch {
+      setProblem("Could not reach the server. Check your connection.");
+      return;
+    }
     setSaved(true);
     await loadScores();
   }
@@ -118,6 +135,10 @@ export function Arcade() {
             Save {lastScore}
           </button>
         </form>
+      ) : null}
+
+      {problem ? (
+        <p className="-mt-4 text-center text-sm text-accent">{problem}</p>
       ) : null}
 
       <section className="flex flex-col gap-3">

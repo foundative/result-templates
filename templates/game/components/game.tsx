@@ -65,8 +65,13 @@ export function Game({
   const flap = useCallback(() => {
     const world = worldRef.current;
     if (world.over) {
-      worldRef.current = freshWorld();
-      worldRef.current.started = true;
+      const restarted = freshWorld();
+      restarted.started = true;
+      // The tap that restarts is also a tap. Without this the new round begins
+      // at velocity zero, so the bird drops out of the sky and the player has
+      // to tap a second time for a reason nothing on screen explains.
+      restarted.velocity = FLAP;
+      worldRef.current = restarted;
       setScore(0);
       setOver(false);
       setStarted(true);

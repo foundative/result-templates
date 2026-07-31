@@ -4,6 +4,7 @@ import {
   type Service,
   formatTime,
   overlaps,
+  safeZone,
   slotsForDay,
   zonedDay,
 } from "@/lib/schedule";
@@ -100,7 +101,9 @@ export async function POST(request: Request) {
   const site = (siteResult.data as
     | { business_name: string | null; time_zone: string | null; notify_email: string | null }[]
     | null)?.[0];
-  const timeZone = site?.time_zone || "UTC";
+  // Same guard as the slots route, and it has to match: if these two disagreed
+  // about the zone, the route would reject the very times the page offered.
+  const timeZone = safeZone(site?.time_zone);
   const service = (serviceResult.data as Service[] | null)?.[0];
   if (!service || !service.published) {
     return Response.json({ error: "That service is not bookable." }, {

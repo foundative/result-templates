@@ -29,6 +29,25 @@ export type Service = {
 export const DAYS_AHEAD = 14;
 
 /**
+ * A zone `Intl` will actually accept, or UTC.
+ *
+ * The owner types this by hand, and one typo ("America/Los_Angel") makes every
+ * Intl call in this file throw. That would take the whole booking page down
+ * with a 500 and leave visitors staring at "Finding open times" forever, which
+ * is a far worse outcome than an hour's offset. Validate at the edge, and the
+ * rest of the file can assume the value is usable.
+ */
+export function safeZone(zone: string | null | undefined): string {
+  if (!zone) return "UTC";
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: zone }).format(new Date());
+    return zone;
+  } catch {
+    return "UTC";
+  }
+}
+
+/**
  * What a zone's clock is offset from UTC at a given instant, in milliseconds.
  *
  * Formatting the instant IN the zone and reading the numbers back is the only
@@ -90,6 +109,19 @@ export function zonedInstant(
   const firstPass = guess - zoneOffsetMs(new Date(guess), timeZone);
   const secondPass = guess - zoneOffsetMs(new Date(firstPass), timeZone);
   return new Date(secondPass);
+}
+
+/** Minutes past midnight that this instant reads as, on `timeZone`'s clock. */
+export function wallMinutes(at: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(at);
+  const read = (type: string) =>
+    Number(parts.find((part) => part.type === type)?.value ?? "0");
+  return (read("hour") % 24) * 60 + read("minute");
 }
 
 /** "2026-08-04", as that instant is dated in `timeZone`. */
@@ -164,7 +196,13 @@ export function slotsForDay(
       minute + service.minutes <= window.end_minute;
       minute += service.minutes
     ) {
-      slots.push(zonedInstant(day, minute, timeZone));
+      const at = zonedInstant(day, minute, timeZone);
+      // On the morning a zone springs forward, the skipped hour does not exist:
+      // asking for 02:30 gives back an instant that reads 01:30, which would
+      // both duplicate the real 01:30 slot and offer an appointment at an hour
+      // nobody agreed to. Round-tripping the wall clock is how you tell.
+      if (wallMinutes(at, timeZone) !== minute) continue;
+      slots.push(at);
     }
   }
   return slots.sort((a, b) => a.getTime() - b.getTime());

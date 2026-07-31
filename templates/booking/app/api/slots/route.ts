@@ -3,6 +3,7 @@ import {
   type Availability,
   type Service,
   overlaps,
+  safeZone,
   slotsForDay,
   upcomingDays,
 } from "@/lib/schedule";
@@ -34,9 +35,12 @@ export async function GET(request: Request) {
     db.from("availability").select("id,weekday,start_minute,end_minute"),
   ]);
 
-  const timeZone =
-    (siteResult.data as { time_zone: string | null }[] | null)?.[0]
-      ?.time_zone || "UTC";
+  // safeZone, not the raw value: the owner types this by hand and one typo
+  // would make every Intl call throw, 500 this route, and leave the public page
+  // stuck on "Finding open times" with nothing to explain it.
+  const timeZone = safeZone(
+    (siteResult.data as { time_zone: string | null }[] | null)?.[0]?.time_zone,
+  );
   const service = (serviceResult.data as Service[] | null)?.[0];
   if (!service || !service.published) {
     return Response.json({ error: "That service is not bookable." }, {

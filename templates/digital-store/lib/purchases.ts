@@ -44,11 +44,14 @@ export async function purchasesFor(userId: string): Promise<Purchase[]> {
         "transaction_id,plan,status,subscription_id,amount,currency_code,billed_at",
       )
       .eq("user_id", userId)
+      // Filtered IN THE QUERY, before the limit. Filtering afterwards lets a
+      // run of renewals fill the window and crowd real purchases out of a
+      // library that is supposed to hold them forever.
+      .in("status", [...PAID])
+      .is("subscription_id", null)
       .order("billed_at", { ascending: false })
       .limit(200);
-    return ((data as Purchase[] | null) ?? []).filter(
-      (purchase) => PAID.has(purchase.status) && !purchase.subscription_id,
-    );
+    return (data as Purchase[] | null) ?? [];
   } catch {
     // The table only exists once payments have been set up. Before that nobody
     // has bought anything, which is the same answer.
@@ -56,11 +59,31 @@ export async function purchasesFor(userId: string): Promise<Purchase[]> {
   }
 }
 
-/** Whether this person may download the file behind `plan`. */
+/**
+ * Whether this person may download the file behind `plan`.
+ *
+ * Asks the database about THIS plan rather than scanning the list above. That
+ * list is capped, and a customer with a long history of renewals could easily
+ * push an old one-time purchase past the cap. They would then be told they do
+ * not own something they paid for, which is the one failure this whole table
+ * exists to prevent. A purchase never expires, so neither may this answer.
+ */
 export async function hasBought(
   userId: string,
   plan: string,
 ): Promise<boolean> {
-  const purchases = await purchasesFor(userId);
-  return purchases.some((purchase) => purchase.plan === plan);
+  try {
+    const { data } = await admin()
+      .database.from("billing_purchases")
+      .select("transaction_id")
+      .eq("user_id", userId)
+      .eq("plan", plan)
+      // Filtered in the query, before any limit. A renewal of the same plan
+      // also counts as having paid for it.
+      .in("status", [...PAID])
+      .limit(1);
+    return ((data as unknown[] | null) ?? []).length > 0;
+  } catch {
+    return false;
+  }
 }
