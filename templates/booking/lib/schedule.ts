@@ -111,11 +111,32 @@ export function zonedWeekday(at: Date, timeZone: string): number {
   return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(name);
 }
 
-/** The next `DAYS_AHEAD` calendar days in the business's zone, from today. */
+/**
+ * The next `DAYS_AHEAD` calendar days in the business's zone, from today.
+ *
+ * Counting DAYS, not adding hours. Stepping by 24 hours and formatting each
+ * instant in the zone looks equivalent and is not: a fall-back day is 25 hours
+ * long, so two steps can land on the same local date, and a spring-forward day
+ * is 23, so one can be skipped. Either way the list comes back with a duplicate
+ * or a hole, which the page then renders as two identical headings or a missing
+ * day, twice a year.
+ *
+ * Converting to a local date once and then incrementing the date NUMBER avoids
+ * it entirely: `Date.UTC` normalises overflow (day 32 becomes the 1st of the
+ * next month) and UTC has no daylight saving to trip over.
+ */
 export function upcomingDays(timeZone: string, from = new Date()): string[] {
+  const [year, month, date] = zonedDay(from, timeZone).split("-").map(Number);
   const days: string[] = [];
   for (let index = 0; index < DAYS_AHEAD; index++) {
-    days.push(zonedDay(new Date(from.getTime() + index * 86_400_000), timeZone));
+    const at = new Date(
+      Date.UTC(year ?? 1970, (month ?? 1) - 1, (date ?? 1) + index),
+    );
+    days.push(
+      `${at.getUTCFullYear()}-${String(at.getUTCMonth() + 1).padStart(2, "0")}-${String(
+        at.getUTCDate(),
+      ).padStart(2, "0")}`,
+    );
   }
   return days;
 }
