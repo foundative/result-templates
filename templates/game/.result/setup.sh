@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Schema for the game template. Runs once, when the project is created, after
 # .env.local exists so the CLI can find its own credentials.
+#
+# ONE `db migrate` call, on purpose. The CLI stamps a migration version from the
+# wall clock to the second, so two that run inside the same second collide and
+# the second is rejected, failing the whole create intermittently.
 set -euo pipefail
 
 cli() { npx --yes @resultdev/cli "$@"; }
@@ -15,13 +19,6 @@ cli db create-table site \
   -c "accent:string" \
   -c "cta_label:string" \
   -c "cta_url:string"
-
-cli db migrate --name site-single-row --sql "
-alter table public.site add column if not exists lock boolean not null default true;
-alter table public.site add constraint site_one_row check (lock);
-create unique index if not exists site_one_row_idx on public.site (lock);
-create policy site_public_read on public.site for select using (true);
-"
 
 # ---------------------------------------------------------------------------
 # scores: the leaderboard.
@@ -38,7 +35,12 @@ cli db create-table scores \
   -c "name:string:required" \
   -c "score:integer:required"
 
-cli db migrate --name scores-public-read --sql "
+cli db migrate --name game-schema --sql "
+alter table public.site add column if not exists lock boolean not null default true;
+alter table public.site add constraint site_one_row check (lock);
+create unique index if not exists site_one_row_idx on public.site (lock);
+create policy site_public_read on public.site for select using (true);
+
 create index if not exists scores_score_idx on public.scores (score desc);
 create policy scores_public_read on public.scores for select using (true);
 create policy scores_owner_delete on public.scores for delete to authenticated

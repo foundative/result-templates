@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # Schema for the community template. Runs once, when the project is created,
 # after .env.local exists so the CLI can find its own credentials.
+#
+# ONE `db migrate` call, on purpose. The CLI stamps a migration version from the
+# wall clock to the second, so two that run inside the same second collide and
+# the second is rejected, failing the whole create intermittently.
 set -euo pipefail
 
 cli() { npx --yes @resultdev/cli "$@"; }
 
 # ---------------------------------------------------------------------------
 # site: the community AND the owner, in one row.
-#
-# Anyone with a Google account can sign in to an app on the open internet, so
-# "signed in" is not "the owner". The owner is whoever holds this row.
 # ---------------------------------------------------------------------------
 cli db create-table site \
   -c "user_id:uuid" \
@@ -17,13 +18,6 @@ cli db create-table site \
   -c "tagline:string" \
   -c "promise:string" \
   -c "plan_slug:string"
-
-cli db migrate --name site-single-row --sql "
-alter table public.site add column if not exists lock boolean not null default true;
-alter table public.site add constraint site_one_row check (lock);
-create unique index if not exists site_one_row_idx on public.site (lock);
-create policy site_public_read on public.site for select using (true);
-"
 
 # ---------------------------------------------------------------------------
 # posts and comments: members only, and DELIBERATELY without any policy.
@@ -47,18 +41,20 @@ cli db create-table posts \
   -c "body:string" \
   -c "pinned:boolean"
 
-cli db migrate --name posts-defaults --sql "
-alter table public.posts alter column pinned set default false;
-alter table public.posts alter column pinned set not null;
-create index if not exists posts_created_at_idx on public.posts (created_at desc);
-"
-
 cli db create-table comments \
   -c "post_id:uuid" \
   -c "author_id:uuid" \
   -c "author_name:string" \
   -c "body:string:required"
 
-cli db migrate --name comments-index --sql "
+cli db migrate --name community-schema --sql "
+alter table public.site add column if not exists lock boolean not null default true;
+alter table public.site add constraint site_one_row check (lock);
+create unique index if not exists site_one_row_idx on public.site (lock);
+create policy site_public_read on public.site for select using (true);
+
+alter table public.posts alter column pinned set default false;
+alter table public.posts alter column pinned set not null;
+create index if not exists posts_created_at_idx on public.posts (created_at desc);
 create index if not exists comments_post_id_idx on public.comments (post_id);
 "

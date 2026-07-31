@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # Schema for the waitlist template. Runs once, when the project is created,
 # after .env.local exists so the CLI can find its own credentials.
+#
+# ONE `db migrate` call, on purpose. The CLI stamps a migration version from the
+# wall clock to the second, so two migrations that run inside the same second
+# collide and the second is rejected with "must be newer than the latest applied
+# migration". That fails the whole create, and it does it intermittently, which
+# is the worst way to find out. Tables first, then one migration for everything
+# that alters them.
 set -euo pipefail
 
 cli() { npx --yes @resultdev/cli "$@"; }
@@ -18,19 +25,6 @@ cli() { npx --yes @resultdev/cli "$@"; }
 # ---------------------------------------------------------------------------
 cli db create-table site -c "user_id:uuid"
 
-# The lock column plus the unique index is what makes "exactly one row" a
-# database rule rather than a promise. Without it a second person could sign in,
-# insert their own row, and become an owner too.
-#
-# The public read is deliberate: the sign-in screen has to know whether this app
-# has been claimed before anyone signs in.
-cli db migrate --name site-single-row --sql "
-alter table public.site add column if not exists lock boolean not null default true;
-alter table public.site add constraint site_one_row check (lock);
-create unique index if not exists site_one_row_idx on public.site (lock);
-create policy site_public_read on public.site for select using (true);
-"
-
 # ---------------------------------------------------------------------------
 # signups: the list itself.
 #
@@ -43,7 +37,18 @@ cli db create-table signups \
   -c "email:string:required:unique" \
   -c "source:string"
 
-cli db migrate --name signups-owner-read --sql "
+cli db migrate --name waitlist-schema --sql "
+-- The lock column plus the unique index is what makes 'exactly one row' a
+-- database rule rather than a promise. Without it a second person could sign
+-- in, insert their own row, and become an owner too.
+alter table public.site add column if not exists lock boolean not null default true;
+alter table public.site add constraint site_one_row check (lock);
+create unique index if not exists site_one_row_idx on public.site (lock);
+
+-- The public read is deliberate: the sign-in screen has to know whether this
+-- app has been claimed before anyone signs in.
+create policy site_public_read on public.site for select using (true);
+
 create policy signups_owner_read on public.signups for select to authenticated
   using (exists (select 1 from public.site where site.user_id = auth.uid()));
 "
