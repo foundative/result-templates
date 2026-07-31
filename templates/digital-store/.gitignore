@@ -1,0 +1,51 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files. .env.local holds this app's backend keys and is regenerated on
+# every build turn, so it must never be committed. The example is safe.
+.env*
+!.env.example
+.env.local
+
+# Build state written by the builder: setup log, dev server markers. The one
+# thing in here that IS committed is a template's own setup script. Git does not
+# descend into an ignored directory, so this has to ignore the contents rather
+# than the directory, or the negation below can never match.
+.result/*
+!.result/setup.sh
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
