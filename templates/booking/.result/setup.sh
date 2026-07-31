@@ -45,6 +45,18 @@ alter table public.services alter column minutes set default 30;
 alter table public.services alter column minutes set not null;
 alter table public.services alter column published set default true;
 alter table public.services alter column published set not null;
+
+-- The generated owner policy says 'your own rows', which sounds right and is
+-- not enough here. This page is on the open internet, so anyone with a Google
+-- account can sign in, insert THEIR own service, and have it published. The
+-- read policy below is not scoped by user (it cannot be: visitors are
+-- anonymous), so a stranger's service would appear on the owner's booking page
+-- and take real appointments. Writes are restricted to the site owner instead.
+drop policy if exists \"services_owner\" on public.services;
+create policy services_owner on public.services for all to authenticated
+  using (exists (select 1 from public.site where site.user_id = auth.uid()))
+  with check (exists (select 1 from public.site where site.user_id = auth.uid()));
+
 create policy services_public_read on public.services for select using (published);
 "
 
@@ -64,6 +76,15 @@ cli db migrate --name availability-read --sql "
 alter table public.availability alter column weekday set not null;
 alter table public.availability alter column start_minute set not null;
 alter table public.availability alter column end_minute set not null;
+
+-- Same reasoning as services, and worse in effect: a stranger who could insert
+-- their own availability would open hours on the owner's calendar that the
+-- owner never agreed to, and people would book them.
+drop policy if exists \"availability_owner\" on public.availability;
+create policy availability_owner on public.availability for all to authenticated
+  using (exists (select 1 from public.site where site.user_id = auth.uid()))
+  with check (exists (select 1 from public.site where site.user_id = auth.uid()));
+
 create policy availability_public_read on public.availability for select using (true);
 "
 

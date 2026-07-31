@@ -59,6 +59,18 @@ alter table public.links alter column position set not null;
 alter table public.links alter column published set default true;
 alter table public.links alter column published set not null;
 create index if not exists links_position_idx on public.links (position);
+
+-- The generated owner policy says 'your own rows', which sounds right and is
+-- not enough here. This page is on the open internet, so anyone with a Google
+-- account can sign in, insert THEIR own link, and have it published. The read
+-- policy below is not scoped by user (it cannot be: visitors are anonymous), so
+-- that stranger's link would appear on the owner's page. Graffiti with extra
+-- steps. Writes are restricted to the person who holds the site row instead.
+drop policy if exists \"links_owner\" on public.links;
+create policy links_owner on public.links for all to authenticated
+  using (exists (select 1 from public.site where site.user_id = auth.uid()))
+  with check (exists (select 1 from public.site where site.user_id = auth.uid()));
+
 create policy links_public_read on public.links for select using (published);
 "
 

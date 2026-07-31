@@ -4,7 +4,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { OwnerGate } from "@/components/owner-gate";
 import { backend } from "@/lib/backend";
-import { type LinkRow, type Site, normalizeHex, safeUrl } from "@/lib/profile";
+import {
+  type LinkRow,
+  type Site,
+  normalizeHex,
+  objectKey,
+  safeUrl,
+} from "@/lib/profile";
 
 export default function Admin() {
   return (
@@ -78,19 +84,30 @@ function Profile() {
   async function upload(file: File) {
     if (!site) return;
     setProblem(null);
-    const { data, error } = await backend.storage.from("avatars").uploadAuto(file);
-    if (error || !data) {
-      setProblem(error?.message ?? "That file would not upload.");
+    // The key is ours, not read back off the response. `upload()` returns three
+    // different shapes depending on the strategy the backend picks and only one
+    // of them is guaranteed to carry a `url`, so trusting `data.url` would
+    // sometimes write undefined and blank the avatar with no error anywhere.
+    const key = objectKey(file.name);
+    const bucket = backend.storage.from("avatars");
+    const { error } = await bucket.upload(key, file);
+    if (error) {
+      setProblem(error.message);
+      return;
+    }
+    const url = bucket.getPublicUrl(key).data?.publicUrl;
+    if (!url) {
+      setProblem("That file uploaded but has no address. Try another.");
       return;
     }
     // Saved on its own rather than waiting for the Save button: an upload that
     // appears to work and then vanishes on reload is the worse failure.
     const { error: writeError } = await backend.database
       .from("site")
-      .update({ avatar_url: data.url })
+      .update({ avatar_url: url })
       .eq("id", site.id);
     if (writeError) setProblem(writeError.message);
-    else edit({ avatar_url: data.url });
+    else edit({ avatar_url: url });
   }
 
   if (!site) return <p className="text-sm text-muted">Loading</p>;
@@ -195,7 +212,13 @@ function Links() {
       setProblem("That address will not open. Try something like acme.com.");
       return;
     }
-    const next = (links?.length ?? 0) + 1;
+    // One past the highest position, NOT the count. With the count, deleting a
+    // link from the middle makes the next one collide with a position that is
+    // still in use, and two links sharing a position make the up and down
+    // buttons swap values that are already equal, so the order stops moving.
+    const next =
+      (links ?? []).reduce((highest, link) => Math.max(highest, link.position), 0) +
+      1;
     // user_id fills in from the session by a column default, so it is not sent.
     const { error } = await backend.database
       .from("links")

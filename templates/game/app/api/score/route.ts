@@ -16,13 +16,24 @@ const MAX_NAME = 24;
 
 const RATE_LIMIT = 10;
 const RATE_WINDOW_MS = 60_000;
+/** Above this, the oldest addresses are dropped. Keeps the map from being its own leak. */
+const RATE_MAX_KEYS = 5000;
 const recent = new Map<string, number[]>();
 
 function rateLimited(ip: string): boolean {
   const now = Date.now();
   const hits = (recent.get(ip) ?? []).filter((at) => now - at < RATE_WINDOW_MS);
   hits.push(now);
+  // Delete before set so the key moves to the end: Map iterates in insertion
+  // order, which makes the eviction below drop the least recently seen.
+  recent.delete(ip);
   recent.set(ip, hits);
+  if (recent.size > RATE_MAX_KEYS) {
+    for (const key of recent.keys()) {
+      recent.delete(key);
+      if (recent.size <= RATE_MAX_KEYS) break;
+    }
+  }
   return hits.length > RATE_LIMIT;
 }
 

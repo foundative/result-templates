@@ -70,6 +70,24 @@ export function safeUrl(url: string): string | null {
   }
 }
 
+/**
+ * A collision-free object key for an upload.
+ *
+ * The key is generated HERE rather than read back off the upload response, and
+ * that is deliberate. `upload()` returns three different shapes depending on
+ * which strategy the backend picks, and only one of them is guaranteed to carry
+ * a `url`. Knowing the key up front means the public URL is built from
+ * something certain instead of something that is usually there.
+ */
+export function objectKey(filename: string): string {
+  const dot = filename.lastIndexOf(".");
+  const hasExt = dot > 0;
+  const ext = hasExt ? filename.slice(dot) : "";
+  const base = hasExt ? filename.slice(0, dot) : filename;
+  const safe = base.replace(/[^a-zA-Z0-9-_]/g, "-").slice(0, 32) || "file";
+  return `${safe}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
+}
+
 /** "Ada Lovelace" becomes "AL". Used when there is no avatar yet. */
 export function initials(name: string | null | undefined): string {
   const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);

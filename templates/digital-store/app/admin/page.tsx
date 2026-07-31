@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { OwnerGate } from "@/components/owner-gate";
 import { backend } from "@/lib/backend";
+import { objectKey } from "@/lib/object-key";
 
 type Site = {
   id: string;
@@ -67,23 +68,27 @@ function Files() {
     setProblem(null);
     // The bucket is private, so this path is not a URL anyone can open. It only
     // becomes a link through /api/download, after the purchase is checked.
-    const { data, error } = await backend.storage
-      .from("downloads")
-      .uploadAuto(file);
-    if (error || !data) {
+    //
+    // The key is ours rather than read back off the response: `upload()` returns
+    // three different shapes depending on the strategy the backend picks, and
+    // storing the wrong field here would mean the file uploads fine and every
+    // buyer's download 404s afterwards.
+    const key = objectKey(file.name);
+    const { error } = await backend.storage.from("downloads").upload(key, file);
+    if (error) {
       setBusy(null);
-      setProblem(error?.message ?? "That file would not upload.");
+      setProblem(error.message);
       return;
     }
     const existing = files.find((entry) => entry.plan_slug === slug);
     const write = existing
       ? backend.database
           .from("product_files")
-          .update({ storage_path: data.key, label: file.name })
+          .update({ storage_path: key, label: file.name })
           .eq("id", existing.id)
       : backend.database
           .from("product_files")
-          .insert({ plan_slug: slug, storage_path: data.key, label: file.name });
+          .insert({ plan_slug: slug, storage_path: key, label: file.name });
     const { error: writeError } = await write;
     setBusy(null);
     if (writeError) setProblem(writeError.message);
