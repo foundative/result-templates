@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+/* ONE LOOK EVERYWHERE. This app is warm and light, always.
+   Nothing here reads the viewer's system settings, so the app cannot look one
+   way in the builder's preview pane and another way in a browser tab, and a
+   color you change is a color you can see. Do not put the palette behind
+   `@media (prefers-color-scheme: ...)`: two palettes driven by an OS setting
+   means the owner sees one of them while edits land in the other, which reads
+   as the builder doing nothing. `dark:` utilities are gated on a `.dark` class
+   that nothing here adds, so a stray one cannot bring a second palette back by
+   accident.
+
+   The accent is the one color the OWNER changes, and they change it from
+   /admin, not from here: it is stored on the site row and set as
+   --accent by app/page.tsx at runtime. The value below is the fallback for the
+   first render, before that row has loaded. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+  /* Warm paper rather than white. A bio page is almost always read on a phone
+     next to a photo, and pure white next to a photo looks like a broken image. */
+  --background: #f7f4ef;
+  --foreground: #1c1a17;
+  --muted: #77716a;
+  --card: #ffffff;
+  --line: #e5ded4;
+  --accent: #1c1a17;
+  --accent-ink: #ffffff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-card: var(--card);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  /* The layout loads Geist and exposes it as --font-sans above. Naming Arial
+     here (which is what a stock Next scaffold does) throws that away. */
+  font-family: var(--font-sans), system-ui, sans-serif;
+}

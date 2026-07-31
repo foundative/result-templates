@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+/* ONE LOOK EVERYWHERE. This app is dark, always.
+   Nothing here reads the viewer's system settings, so the app cannot look one
+   way in the builder's preview pane and another way in a browser tab, and a
+   color you change is a color you can see. Do not put the palette behind
+   `@media (prefers-color-scheme: ...)`: two palettes driven by an OS setting
+   means the owner sees one of them while edits land in the other, which reads
+   as the builder doing nothing. `dark:` utilities are gated on a `.dark` class
+   that nothing here adds, so a stray one cannot bring a second palette back by
+   accident.
+
+   Dark is a choice, not a default: a launch page is read once, at night, on a
+   phone, from a link in someone's feed. If you want this app light, change the
+   six values below and leave the structure alone. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: dark;
+  --background: #09090b;
+  --foreground: #fafafa;
+  /* Secondary copy. Everything that is not the headline or the button. */
+  --muted: #8b8b94;
+  /* Inputs, cards, anything that has to separate from the page without a rule. */
+  --surface: #141418;
+  --line: #26262c;
+  /* The one accent, spent on the call to action and nothing else. A second
+     accent is how a page stops having a focal point. */
+  --accent: #d6ff3f;
+  --accent-ink: #0a0a0b;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-surface: var(--surface);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  /* The layout loads Geist and exposes it as --font-sans above. Naming Arial
+     here (which is what a stock Next scaffold does) throws that away. */
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Chrome paints autofilled inputs its own pale wash, which on a dark page is a
+   glowing white block over one field. This is the only way to override it. */
+input:-webkit-autofill,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--foreground);
+  -webkit-box-shadow: 0 0 0 1000px var(--surface) inset;
+}

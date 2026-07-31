@@ -6,6 +6,54 @@
       "name": "Blank app",
       "description": "A fresh Next.js app with TypeScript and Tailwind, wired to your database, auth and storage.",
       "tags": ["Next.js", "TypeScript", "Tailwind"]
+    },
+    {
+      "id": "waitlist",
+      "name": "Waitlist",
+      "description": "A launch page that collects emails, confirms them by mail, and shows you the list. For a business that is not open yet.",
+      "tags": ["Launch", "Email", "No payments"]
+    },
+    {
+      "id": "link-in-bio",
+      "name": "Link in bio",
+      "description": "One page holding every link you post, with per-link click tracking and a shop section that appears once you have something to sell.",
+      "tags": ["Creator", "Links", "Sells"]
+    },
+    {
+      "id": "booking",
+      "name": "Bookings",
+      "description": "Your services, your opening hours, and a page customers book a real time slot on. Confirms by email, both ways.",
+      "tags": ["Services", "Scheduling", "Email"]
+    },
+    {
+      "id": "community",
+      "name": "Paid community",
+      "description": "A members-only feed behind a subscription. The paywall is enforced on the server, not just hidden in the page.",
+      "tags": ["Membership", "Subscription", "Feed"]
+    },
+    {
+      "id": "saas",
+      "name": "Subscription app",
+      "description": "A marketing page, a paywalled app behind it, and billing your customers manage themselves. Sign in, subscribe, cancel, all wired.",
+      "tags": ["SaaS", "Subscription", "Billing"]
+    },
+    {
+      "id": "game",
+      "name": "Arcade game",
+      "description": "A one-button browser game with a global leaderboard, ending on your call to action. Something worth sharing that sends people somewhere.",
+      "tags": ["Marketing", "Leaderboard", "No payments"]
+    },
+    {
+      "id": "marketplace",
+      "name": "Directory",
+      "description": "A searchable list anyone can submit to and only you approve. Rendered on the server so the listings can be found in search.",
+      "tags": ["Listings", "Moderation", "SEO"]
+    },
+    {
+      "id": "digital-store",
+      "name": "Digital store",
+      "description": "Sell files. Tax handled for you, delivery gated on the real payment, and a library the buyer can come back to.",
+      "tags": ["Products", "One-time", "Downloads"]
     }
   ]
 }
