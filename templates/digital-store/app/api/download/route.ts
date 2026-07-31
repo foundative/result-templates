@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     return Response.json({ error: "Which product?" }, { status: 400 });
   }
 
-  if (!(await hasBought(caller.id, plan))) {
+  if (!(await hasBought(request, plan))) {
     // Deliberately the same answer whether they never bought it or it does not
     // exist. There is nothing useful in telling someone which.
     return Response.json({ error: "You do not own this." }, { status: 403 });
@@ -66,5 +66,5 @@ export async function POST(request: Request) {
   if (!caller) {
     return Response.json({ error: "Sign in first." }, { status: 401 });
   }
-  return Response.json({ purchases: await purchasesFor(caller.id) });
+  return Response.json({ purchases: await purchasesFor(request) });
 }

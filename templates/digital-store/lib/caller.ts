@@ -21,8 +21,13 @@ function bearer(request: Request): string | null {
   return match?.[1]?.trim() || null;
 }
 
+/** The caller's own bearer token, for asking the SDK questions as them. */
+export function bearerToken(request: Request): string | null {
+  return bearer(request);
+}
+
 /** A client acting AS the caller, so row-level security applies to them. */
-function asCaller(token: string) {
+export function asCaller(token: string) {
   return createClient({
     baseUrl: process.env.NEXT_PUBLIC_BACKEND_URL!,
     accessToken: token,

@@ -42,14 +42,23 @@ URL anyone can type. So `successUrl` only decides where somebody LANDS. What
 they own comes from `billing_purchases`, a table in this app's own database that
 the platform's webhook receiver writes when the payment event actually arrives.
 
-`lib/purchases.ts` is the only place that reads it. Two details in there matter:
+`lib/purchases.ts` asks the SDK rather than querying the table, and that is
+deliberate: `hasPurchased` already knows all three parts of the rule (the
+payment completed, it is not a subscription renewal, and it has not been
+refunded or charged back). An earlier version of this file re-implemented the
+first two and forgot the third, so a refunded buyer kept their download. If you
+need a new entitlement question, add it to the SDK rather than writing a second
+copy of the rule here.
+
+Two details in that rule matter:
 
 - **Renewals are filtered out.** A subscription rebill fires the same event and
   lands in the same table with `subscription_id` set. A library is what someone
   bought, not a list of receipts.
-- **Both `completed` and `paid` count.** One sale emits both and the order is
-  not guaranteed, so waiting for `completed` alone would hold a download back
-  for the gap between them.
+- **A refund takes it back.** An approved full refund or a chargeback marks the
+  purchase revoked, and `hasPurchased` goes false. A reversed chargeback puts it
+  back. Partial refunds accumulate, so two halves revoke where neither did
+  alone.
 
 ## The download path, in order
 
