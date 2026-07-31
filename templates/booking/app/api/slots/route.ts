@@ -51,14 +51,21 @@ export async function GET(request: Request) {
   const to = days[days.length - 1];
   // One read for the whole window rather than one per day. Only the two columns
   // needed to decide "taken", so a leak here would leak nothing.
+  //
+  // The bounds really are widened by a day on each side, because `from` and
+  // `to` are calendar days in the BUSINESS's zone while these bounds are UTC.
+  // A zone west of UTC pushes the last evening onto the next UTC date and one
+  // east of it pulls the first morning onto the previous. Miss those rows and
+  // the page offers times that are already taken, right up until the booking
+  // request rejects them. Extra rows cost nothing: they simply do not overlap.
+  const DAY_MS = 86_400_000;
+  const lower = new Date(Date.parse(`${from}T00:00:00Z`) - DAY_MS);
+  const upper = new Date(Date.parse(`${to}T00:00:00Z`) + 2 * DAY_MS);
   const { data: bookedRows } = await db
     .from("bookings")
     .select("starts_at,minutes")
-    .gte("starts_at", `${from}T00:00:00Z`)
-    // The window is in the business's zone and this bound is in UTC, so it is
-    // widened by a day rather than being clever about it. Extra rows are
-    // harmless; a missing one would double-book somebody.
-    .lte("starts_at", `${to}T23:59:59Z`);
+    .gte("starts_at", lower.toISOString())
+    .lte("starts_at", upper.toISOString());
 
   const booked = ((bookedRows as { starts_at: string; minutes: number }[] | null) ??
     []).map((row) => ({

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { OwnerGate } from "@/components/owner-gate";
+import { callApi } from "@/lib/api";
 import { backend } from "@/lib/backend";
 import { objectKey } from "@/lib/object-key";
 
@@ -48,14 +49,15 @@ function Files() {
   const [problem, setProblem] = useState<string | null>(null);
 
   async function load() {
-    const [{ data: planData }, { data: fileData }] = await Promise.all([
+    // `product_files` has no policies, so the browser cannot query it and this
+    // has to go through the route. Reading it directly here would silently
+    // return an empty list and every product would look unattached.
+    const [{ data: planData }, mapping] = await Promise.all([
       backend.payments.plans(),
-      backend.database
-        .from("product_files")
-        .select("id,plan_slug,storage_path,label"),
+      callApi<{ files: ProductFile[] }>("/api/files"),
     ]);
     setPlans((planData as Plan[] | null) ?? []);
-    setFiles((fileData as ProductFile[] | null) ?? []);
+    setFiles(mapping.data?.files ?? []);
   }
 
   useEffect(() => {
@@ -80,18 +82,18 @@ function Files() {
       setProblem(error.message);
       return;
     }
-    const existing = files.find((entry) => entry.plan_slug === slug);
-    const write = existing
-      ? backend.database
-          .from("product_files")
-          .update({ storage_path: key, label: file.name })
-          .eq("id", existing.id)
-      : backend.database
-          .from("product_files")
-          .insert({ plan_slug: slug, storage_path: key, label: file.name });
-    const { error: writeError } = await write;
+    // Same reason: the mapping is written by the route, behind an owner check,
+    // never from here.
+    const saved = await callApi("/api/files", {
+      method: "POST",
+      body: JSON.stringify({
+        planSlug: slug,
+        storagePath: key,
+        label: file.name,
+      }),
+    });
     setBusy(null);
-    if (writeError) setProblem(writeError.message);
+    if (saved.error) setProblem(saved.error);
     else await load();
   }
 

@@ -54,28 +54,39 @@ export async function GET(request: Request) {
   if (gated instanceof Response) return gated;
 
   const db = admin().database;
-  const [postsResult, commentsResult] = await Promise.all([
-    db
-      .from("posts")
-      .select("id,title,body,pinned,author_id,author_name,created_at")
-      .order("created_at", { ascending: false })
-      .limit(100),
-    db
-      .from("comments")
-      .select("id,post_id,body,author_id,author_name,created_at")
-      .order("created_at", { ascending: true })
-      .limit(500),
-  ]);
+  // Pinned first, then newest, ordered IN THE QUERY. Sorting after the limit
+  // would drop an old pinned post off the end before the sort ever saw it, so
+  // pinning would stop working as soon as there were 100 newer posts.
+  const { data: postRows } = await db
+    .from("posts")
+    .select("id,title,body,pinned,author_id,author_name,created_at")
+    .order("pinned", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(100);
 
-  const comments = (commentsResult.data as Comment[] | null) ?? [];
-  const posts = ((postsResult.data as Post[] | null) ?? [])
-    // Pinned first, then newest. Sorted here rather than in the query because
-    // PostgREST orders by columns and this is two keys with different senses.
-    .sort((a, b) => Number(b.pinned) - Number(a.pinned))
-    .map((post) => ({
-      ...post,
-      comments: comments.filter((comment) => comment.post_id === post.id),
-    }));
+  const found = (postRows as Post[] | null) ?? [];
+  // Comments for THESE posts, newest first. A global ascending window returns
+  // the oldest ones forever, so past the limit a new reply would never appear.
+  const { data: commentRows } = found.length
+    ? await db
+        .from("comments")
+        .select("id,post_id,body,author_id,author_name,created_at")
+        .in(
+          "post_id",
+          found.map((post) => post.id),
+        )
+        .order("created_at", { ascending: false })
+        .limit(1000)
+    : { data: [] };
+
+  const comments = (commentRows as Comment[] | null) ?? [];
+  const posts = found.map((post) => ({
+    ...post,
+    comments: comments
+      .filter((comment) => comment.post_id === post.id)
+      // Read order, restored after fetching newest-first.
+      .sort((a, b) => a.created_at.localeCompare(b.created_at)),
+  }));
 
   return Response.json({
     posts,

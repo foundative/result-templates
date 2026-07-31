@@ -386,9 +386,17 @@ function Settings() {
       .then(({ data }) => {
         const row = (data as Site[] | null)?.[0] ?? null;
         if (row && !row.time_zone) {
-          // Seed from the browser rather than leaving it on UTC. An owner who
-          // never opens this section still gets their own hours.
-          row.time_zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          // Seed from the browser rather than leaving it on UTC, and WRITE IT
+          // rather than only showing it. Seeding state alone was a trap: the
+          // field looked correct, so the owner had no reason to press Save, and
+          // the stored value stayed null. Every slot and every confirmation
+          // then fell back to UTC while the screen said otherwise.
+          const guess = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          row.time_zone = guess;
+          void backend.database
+            .from("site")
+            .update({ time_zone: guess })
+            .eq("id", row.id);
         }
         setSite(row);
       });

@@ -63,6 +63,13 @@ The bucket is **private** and `product_files` has **no policy at all**, so the
 storage path never reaches a browser. A public bucket here would mean one
 leaked URL is the product, forever.
 
+That has a consequence worth stating, because getting it wrong breaks the whole
+template silently: **the admin page cannot query `product_files` either.** No
+policy means no policy for anybody, the owner included. Attaching a file goes
+through `/api/files`, which checks ownership and then writes with the admin key.
+A browser-side insert there looks reasonable, is rejected, and leaves every
+product showing "no file attached" while the uploads pile up in the bucket.
+
 ## Products live in Finance, not in a table here
 
 `payments.plans()` is the catalogue. Do not build a `products` table: a price id

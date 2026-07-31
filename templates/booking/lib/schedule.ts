@@ -63,9 +63,16 @@ function zoneOffsetMs(at: Date, timeZone: string): number {
  * The instant at which a wall clock in `timeZone` reads this date and minute.
  *
  * Guess that the wall clock is UTC, ask what the zone's offset is around that
- * guess, then subtract it. One correction is right everywhere except inside the
- * hour a daylight saving change skips, which is not a time anyone can be
- * standing in anyway.
+ * guess, then subtract it. TWO passes, not one, and that is the whole point:
+ * the first guess can land on the far side of a daylight saving change from the
+ * time actually being asked for. Correcting once with an offset sampled at the
+ * wrong side of the boundary shifts every appointment that day by an hour, and
+ * it does it silently, twice a year.
+ *
+ * The second pass re-samples the offset at the candidate instant and re-applies
+ * it. Where the two agree, one pass would have been enough; where they disagree
+ * the second is the right one. A wall time inside the hour a spring-forward
+ * skips does not exist at all, and lands on the hour after it.
  */
 export function zonedInstant(
   day: string,
@@ -80,7 +87,9 @@ export function zonedInstant(
     Math.floor(minutes / 60),
     minutes % 60,
   );
-  return new Date(guess - zoneOffsetMs(new Date(guess), timeZone));
+  const firstPass = guess - zoneOffsetMs(new Date(guess), timeZone);
+  const secondPass = guess - zoneOffsetMs(new Date(firstPass), timeZone);
+  return new Date(secondPass);
 }
 
 /** "2026-08-04", as that instant is dated in `timeZone`. */

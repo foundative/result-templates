@@ -39,14 +39,26 @@ involves a clock.
 Storing "9am" and hoping is what moves every appointment by an hour twice a
 year. Do not simplify this by dropping the time zone.
 
-## Two rules that keep bookings honest
+## Three rules that keep bookings honest
 
 **1. The slot is rechecked on the server, immediately before the insert.** Two
 people can open the page at the same second and see the same free slot. The
 browser's opinion of what is free is a guess by the time it arrives. See
 `app/api/book/route.ts`.
 
-**2. The requested time has to be one the business actually offers.** A booking
+**2. The database has the final say.** The recheck and the insert are two
+statements, so two requests a millisecond apart can both pass the recheck. No
+amount of care in the route closes that; only a constraint can. `setup.sh` adds
+an exclusion constraint on the booking's time range, and falls back to a unique
+index on `starts_at` when the backend will not install `btree_gist`.
+
+Know which one you have. **On the backends checked so far the extension is not
+available, so the fallback is what runs**, and it stops two bookings at the same
+instant but not a partial overlap between services of different lengths. If that
+matters for this business, give every service the same length, or add the
+extension and the constraint by hand.
+
+**3. The requested time has to be one the business actually offers.** A booking
 request is a public endpoint, so it is not enough to check that a slot is free:
 `3am on Sunday` is free too. The route rebuilds the day's real slots and
 requires an exact match.

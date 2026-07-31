@@ -108,6 +108,33 @@ cli db migrate --name bookings-owner-read --sql "
 alter table public.bookings alter column minutes set default 30;
 alter table public.bookings alter column minutes set not null;
 create index if not exists bookings_starts_at_idx on public.bookings (starts_at);
+
+-- The double-booking guarantee, and it has to live HERE rather than in the
+-- route. The route checks a slot is free and then inserts, and those are two
+-- statements: two requests a millisecond apart both see a free slot and both
+-- write. No amount of care in application code closes that, only the database
+-- can. An exclusion constraint refuses any booking whose time range overlaps
+-- one already stored, which is exactly the rule a single-provider calendar
+-- needs.
+--
+-- Wrapped in a fallback because the constraint needs the btree_gist extension
+-- and a backend that will not install it must not fail project creation. The
+-- unique index it falls back to is narrower (identical start times only, not
+-- overlaps) but it is always available, and identical starts are what the race
+-- actually produces: slots are discrete.
+do \$\$
+begin
+  begin
+    create extension if not exists btree_gist;
+    alter table public.bookings add constraint bookings_no_overlap
+      exclude using gist (
+        tstzrange(starts_at, starts_at + make_interval(mins => minutes)) with &&
+      );
+  exception when others then
+    create unique index if not exists bookings_one_per_start
+      on public.bookings (starts_at);
+  end;
+end \$\$;
 create policy bookings_owner_read on public.bookings for select to authenticated
   using (exists (select 1 from public.site where site.user_id = auth.uid()));
 create policy bookings_owner_write on public.bookings for delete to authenticated

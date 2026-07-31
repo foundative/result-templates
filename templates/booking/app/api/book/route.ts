@@ -149,9 +149,19 @@ export async function POST(request: Request) {
     note,
   });
   if (error) {
+    // The recheck above narrows the race; the database closes it. Two requests
+    // a millisecond apart both pass the recheck, and the second one loses here,
+    // on the overlap constraint. 23P01 is an exclusion violation and 23505 a
+    // unique one, depending on which guarantee the backend could install. Both
+    // mean the same thing to the person waiting: somebody else got there first.
+    const raced = error.code === "23P01" || error.code === "23505";
     return Response.json(
-      { error: "Could not save that. Try again in a moment." },
-      { status: 502 },
+      {
+        error: raced
+          ? "Somebody just took that time. Pick another."
+          : "Could not save that. Try again in a moment.",
+      },
+      { status: raced ? 409 : 502 },
     );
   }
 
