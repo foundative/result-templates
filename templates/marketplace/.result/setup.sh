@@ -1,25 +1,20 @@
 #!/usr/bin/env bash
 # Schema for the marketplace template. Runs once, when the project is created,
 # after .env.local exists so the CLI can find its own credentials.
+#
+# ONE `db migrate` call, on purpose. The CLI stamps a migration version from the
+# wall clock to the second, so two that run inside the same second collide and
+# the second is rejected, failing the whole create intermittently.
 set -euo pipefail
 
 cli() { npx --yes @resultdev/cli "$@"; }
 
-# ---------------------------------------------------------------------------
 # site: the directory AND the owner, in one row.
-# ---------------------------------------------------------------------------
 cli db create-table site \
   -c "user_id:uuid" \
   -c "name:string" \
   -c "tagline:string" \
   -c "categories:string"
-
-cli db migrate --name site-single-row --sql "
-alter table public.site add column if not exists lock boolean not null default true;
-alter table public.site add constraint site_one_row check (lock);
-create unique index if not exists site_one_row_idx on public.site (lock);
-create policy site_public_read on public.site for select using (true);
-"
 
 # ---------------------------------------------------------------------------
 # listings: the directory itself.
@@ -42,11 +37,17 @@ cli db create-table listings \
   -c "published:boolean" \
   -c "featured:boolean"
 
-cli db migrate --name listings-defaults-and-read --sql "
+cli db migrate --name marketplace-schema --sql "
+alter table public.site add column if not exists lock boolean not null default true;
+alter table public.site add constraint site_one_row check (lock);
+create unique index if not exists site_one_row_idx on public.site (lock);
+create policy site_public_read on public.site for select using (true);
+
 alter table public.listings alter column published set default false;
 alter table public.listings alter column published set not null;
 alter table public.listings alter column featured set default false;
 alter table public.listings alter column featured set not null;
-create index if not exists listings_published_idx on public.listings (published, featured desc, created_at desc);
+create index if not exists listings_published_idx
+  on public.listings (published, featured desc, created_at desc);
 create policy listings_public_read on public.listings for select using (published);
 "

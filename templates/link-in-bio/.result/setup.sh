@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # Schema for the link-in-bio template. Runs once, when the project is created,
 # after .env.local exists so the CLI can find its own credentials.
+#
+# ONE `db migrate` call, on purpose. The CLI stamps a migration version from the
+# wall clock to the second, so two migrations that run inside the same second
+# collide and the second is rejected with "must be newer than the latest applied
+# migration". That fails the whole create, intermittently. Tables first, then
+# one migration for everything that alters them.
 set -euo pipefail
 
 cli() { npx --yes @resultdev/cli "$@"; }
@@ -13,10 +19,6 @@ cli() { npx --yes @resultdev/cli "$@"; }
 # person. Anyone with a Google account can sign in to an app on the open
 # internet, so "signed in" is not "the owner": the owner is whoever holds this
 # row, and every owner-only rule is written against it.
-#
-# create-table gives it the standard owner policy for free: reads and writes
-# scoped to the signed-in user, with user_id defaulting to the session, so the
-# claim cannot be forged from the client.
 # ---------------------------------------------------------------------------
 cli db create-table site \
   -c "user_id:uuid" \
@@ -25,19 +27,6 @@ cli db create-table site \
   -c "bio:string" \
   -c "avatar_url:string" \
   -c "accent:string"
-
-# The lock column plus the unique index is what makes "exactly one row" a
-# database rule rather than a promise. Without it a second person could sign in,
-# insert their own row, and become an owner too.
-#
-# The public read is the whole point of the app: a visitor has to see the
-# profile without signing in.
-cli db migrate --name site-single-row --sql "
-alter table public.site add column if not exists lock boolean not null default true;
-alter table public.site add constraint site_one_row check (lock);
-create unique index if not exists site_one_row_idx on public.site (lock);
-create policy site_public_read on public.site for select using (true);
-"
 
 # ---------------------------------------------------------------------------
 # links: what the page is for.
@@ -49,11 +38,27 @@ cli db create-table links \
   -c "position:integer" \
   -c "published:boolean"
 
-# Defaults are set here because create-table cannot express one. `published`
-# has to be NOT NULL for the read policy below to be readable: a policy of
-# `using (published)` treats NULL as "not true", which would hide a link for a
-# reason nobody could see in the admin UI.
-cli db migrate --name links-defaults-and-read --sql "
+# ---------------------------------------------------------------------------
+# avatars: a public bucket, so the profile picture has a plain URL.
+# Uploads still require a signed-in user, which means only the owner can write.
+# ---------------------------------------------------------------------------
+cli storage create-bucket avatars
+
+cli db migrate --name link-in-bio-schema --sql "
+-- Exactly one row, as a database rule rather than a promise. Without it a
+-- second person could sign in, insert their own row, and become an owner too.
+alter table public.site add column if not exists lock boolean not null default true;
+alter table public.site add constraint site_one_row check (lock);
+create unique index if not exists site_one_row_idx on public.site (lock);
+
+-- The public read is the whole point of the app: a visitor has to see the
+-- profile without signing in.
+create policy site_public_read on public.site for select using (true);
+
+-- Defaults are set here because create-table cannot express one. \`published\`
+-- has to be NOT NULL for the read policy below to be readable: a policy of
+-- \`using (published)\` treats NULL as 'not true', which would hide a link for a
+-- reason nobody could see in the admin UI.
 alter table public.links alter column position set default 0;
 alter table public.links alter column position set not null;
 alter table public.links alter column published set default true;
@@ -73,9 +78,3 @@ create policy links_owner on public.links for all to authenticated
 
 create policy links_public_read on public.links for select using (published);
 "
-
-# ---------------------------------------------------------------------------
-# avatars: a public bucket, so the profile picture has a plain URL.
-# Uploads still require a signed-in user, which means only the owner can write.
-# ---------------------------------------------------------------------------
-cli storage create-bucket avatars
