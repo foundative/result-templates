@@ -6,13 +6,12 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { backend } from "@/lib/backend";
 
-type Purchase = {
-  transaction_id: string;
-  plan: string | null;
-  amount: string | null;
-  currency_code: string | null;
-  billed_at: string | null;
-};
+// Imported, not redeclared. This page reads what /api/download returns, and a
+// local copy of that shape is a contract nobody checks: the previous one still
+// said snake_case after the route moved to the SDK's camelCase, so every row
+// got an undefined React key and no date, and the `as` cast on the response
+// kept typecheck quiet about it.
+import type { Purchase } from "@/lib/purchases";
 
 export default function Library() {
   const [purchases, setPurchases] = useState<Purchase[] | null>(null);
@@ -33,7 +32,7 @@ export default function Library() {
       method: "POST",
       headers: { authorization: `Bearer ${token}` },
     });
-    const body = (await response.json()) as { purchases?: Purchase[] };
+    const body: { purchases?: Purchase[] } = await response.json();
     setPurchases(body.purchases ?? []);
   }
 
@@ -101,15 +100,15 @@ export default function Library() {
           {purchases.map((purchase) => (
             <li
               className="flex items-center justify-between gap-4 rounded-2xl border border-line bg-card px-5 py-4"
-              key={purchase.transaction_id}
+              key={purchase.transactionId}
             >
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">
                   {purchase.plan ?? "Purchase"}
                 </p>
                 <p className="text-xs text-muted">
-                  {purchase.billed_at
-                    ? new Date(purchase.billed_at).toLocaleDateString()
+                  {purchase.billedAt
+                    ? new Date(purchase.billedAt).toLocaleDateString()
                     : ""}
                 </p>
               </div>
