@@ -10,7 +10,7 @@
 // `export const dynamic = "force-dynamic"` to the page, which does work.
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { backend } from "@/lib/backend";
 import { type Service, formatDay, formatPrice, formatTime } from "@/lib/schedule";
 
@@ -33,6 +33,11 @@ export function Booking() {
   const [slots, setSlots] = useState<Slots | null>(null);
   const [chosen, setChosen] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState<string | null>(null);
+  const [slotsProblem, setSlotsProblem] = useState<string | null>(null);
+  // Which slots request is the current one. Switching service twice quickly
+  // starts two fetches and they can come back in either order, so the answer to
+  // the older one has to be thrown away rather than painted over the newer.
+  const slotsRequest = useRef(0);
 
   useEffect(() => {
     backend.database
@@ -49,11 +54,29 @@ export function Booking() {
   }, []);
 
   async function pick(next: Service) {
+    const ticket = ++slotsRequest.current;
     setService(next);
     setChosen(null);
     setSlots(null);
-    const response = await fetch(`/api/slots?service=${next.id}`);
-    if (response.ok) setSlots((await response.json()) as Slots);
+    setSlotsProblem(null);
+    try {
+      const response = await fetch(`/api/slots?service=${next.id}`);
+      if (ticket !== slotsRequest.current) return;
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        setSlotsProblem(body?.error ?? "Could not load the open times.");
+        return;
+      }
+      setSlots((await response.json()) as Slots);
+    } catch {
+      // Without this the page sits on "Finding open times" forever, and the
+      // only way out is picking a different service.
+      if (ticket === slotsRequest.current) {
+        setSlotsProblem("Could not reach the server. Check your connection.");
+      }
+    }
   }
 
   if (site === undefined) {
@@ -156,7 +179,18 @@ export function Booking() {
 
       {service ? (
         <Step label="When suits you?" number={2}>
-          {slots === null ? (
+          {slotsProblem ? (
+            <div className="flex flex-col items-start gap-3">
+              <p className="text-sm text-red-700">{slotsProblem}</p>
+              <button
+                className="h-10 rounded-xl border border-line bg-card px-4 text-sm transition-colors hover:bg-background"
+                onClick={() => void pick(service)}
+                type="button"
+              >
+                Try again
+              </button>
+            </div>
+          ) : slots === null ? (
             <p className="text-sm text-muted">Finding open times</p>
           ) : slots.days.length === 0 ? (
             <Empty>
